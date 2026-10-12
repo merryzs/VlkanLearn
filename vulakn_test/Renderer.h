@@ -12,10 +12,12 @@ private :
     vk::raii::Context context;
     vk::raii::Instance instance = nullptr;
     vk::raii::DebugUtilsMessengerEXT debugMessenger = nullptr;
+    vk::raii::PhysicalDevice physicalDevice = nullptr;
+    
     
     void setupDebugMessenger();
     void pickPhysicalDevice();
-    
+    void createlogicalDevice();
     std::vector<char const*> GetRequiredExtensions(); 
     std::vector<char const*> GetRequiredLayers(); 
     

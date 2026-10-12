@@ -146,15 +146,17 @@ std::vector requiresDeviceExtensions = {vk::KHRSwapchainExtensionName};
 
 void Renderer::pickPhysicalDevice()
 {
+    std::vector<vk::raii::PhysicalDevice> physicalDevices = instance.enumeratePhysicalDevices();
     
-    auto physicalDevices = vk::raii::PhysicalDevices(instance);
+    auto const DevIt = std::ranges::find_if( physicalDevices, [&](auto const& physicalDevice) {return CheckDeviceSuitability( physicalDevice ); } );
     
-    if (physicalDevices.empty())
+    if (DevIt == physicalDevices.end())
     {
-        throw std::runtime_error("No physical devices (GPU) found");
+        throw std::runtime_error( "failed to find a suitable physical device" );
     }
-    
+    physicalDevice = *DevIt;
 }
+
 
 bool Renderer::CheckDeviceSuitability(vk::raii::PhysicalDevice const& physicalDevice)
 {
@@ -167,11 +169,24 @@ bool Renderer::CheckDeviceSuitability(vk::raii::PhysicalDevice const& physicalDe
     auto QueueFamiy = physicalDevice.getQueueFamilyProperties();
     bool supportsGraphics = std::ranges::any_of(QueueFamiy, [](auto const& qfp) {return !!( qfp.queueFlags & vk::QueueFlagBits::eGraphics); });
 
-    
-    if (deviceProperties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu && deviceFeatures.geometryShader)
+    auto availableDevicesExtensions = physicalDevice.enumerateDeviceExtensionProperties();
+    bool supportsAllRequiredExtentions = std::ranges::all_of(requiresDeviceExtensions, [&availableDevicesExtensions](auto const& requiredDeviceExtensions)
     {
-        return true;
-    }
-    return false;
+        return std::ranges::any_of(availableDevicesExtensions, [requiredDeviceExtensions](auto const& availableDevicesExtensions) 
+        { return strcmp( availableDevicesExtensions.extensionName, requiredDeviceExtensions) ==0; });
+    } );
+    
+    auto features = physicalDevice.template getFeatures2<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceVulkan11Features, vk::PhysicalDeviceVulkan13Features, vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT> ();
+    
+    bool supportsRequiredFeatures = features.template get<vk::PhysicalDeviceVulkan11Features>().shaderDrawParameters &&
+        features.template get<vk::PhysicalDeviceVulkan13Features>().dynamicRendering &&
+            features.template get<vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>().extendedDynamicState;
+    
+    return CanUseVulkan1_3 && supportsGraphics && supportsAllRequiredExtentions && supportsRequiredFeatures;
+}
+
+
+void Renderer::createlogicalDevice()
+{
 }
 
