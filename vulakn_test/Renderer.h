@@ -20,7 +20,6 @@ private :
     void createlogicalDevice();
     std::vector<char const*> GetRequiredExtensions(); 
     std::vector<char const*> GetRequiredLayers(); 
-    
     static VKAPI_ATTR vk::Bool32 VKAPI_CALL DebugReportCallback(vk::DebugUtilsMessageSeverityFlagBitsEXT severity , vk::DebugUtilsMessageTypeFlagsEXT type, const vk::DebugUtilsMessengerCallbackDataEXT* callback, void*);
 
     bool CheckDeviceSuitability(vk::raii::PhysicalDevice const&physicalDevice);

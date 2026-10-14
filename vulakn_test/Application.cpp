@@ -26,6 +26,8 @@ void Application::Destroy()
 
 void Application::InitVulkan()
 {
+    renderer = new Renderer();
+    renderer->createInstance();
 }
 
 void Application::DestroyWindow()
