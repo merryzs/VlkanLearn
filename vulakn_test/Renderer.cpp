@@ -87,6 +87,7 @@ void Renderer::createInstance()
     
     setupDebugMessenger();
     pickPhysicalDevice();
+    createlogicalDevice();
 }
 
 std::vector<char const*> Renderer::GetRequiredExtensions()
@@ -182,6 +183,17 @@ bool Renderer::CheckDeviceSuitability(vk::raii::PhysicalDevice const& physicalDe
 
 void Renderer::createlogicalDevice()
 {
+    std::vector<vk::QueueFamilyProperties> queueFamilyProperties = physicalDevice.getQueueFamilyProperties();
+   
+    auto graphicsQueueFamilyProperty = std::ranges::find_if( queueFamilyProperties, [] (auto const &qfp) { return ( qfp.queueFlags & vk::QueueFlagBits::eGraphics) != static_cast<vk::QueueFlagBits>(0); } );
+    auto graphicIndex = static_cast<uint32_t>(std::distance(queueFamilyProperties.begin(), graphicsQueueFamilyProperty)) ;
     
+    
+    vk::DeviceQueueCreateInfo queueInfo  = 
+    {
+        .queueFamilyIndex = graphicIndex,
+        .queueCount = 1,
+        .pQueuePriorities = &queuePriority
+    };
 }
 
