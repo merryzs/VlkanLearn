@@ -15,13 +15,17 @@ private :
     vk::raii::PhysicalDevice physicalDevice = nullptr;
     vk::raii::Device device = nullptr;
     vk::raii::Queue graphicQueue = nullptr;
+    vk::raii::SurfaceKHR surface = nullptr;
     
     
     void setupDebugMessenger();
     void pickPhysicalDevice();
     void createlogicalDevice();
+    
+    
     std::vector<char const*> GetRequiredExtensions(); 
     std::vector<char const*> GetRequiredLayers(); 
+    
     static VKAPI_ATTR vk::Bool32 VKAPI_CALL DebugReportCallback(vk::DebugUtilsMessageSeverityFlagBitsEXT severity , vk::DebugUtilsMessageTypeFlagsEXT type, const vk::DebugUtilsMessengerCallbackDataEXT* callback, void*);
 
     bool CheckDeviceSuitability(vk::raii::PhysicalDevice const&physicalDevice);

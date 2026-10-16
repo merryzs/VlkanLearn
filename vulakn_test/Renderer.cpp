@@ -183,11 +183,11 @@ bool Renderer::CheckDeviceSuitability(vk::raii::PhysicalDevice const& physicalDe
 
 void Renderer::createlogicalDevice()
 {
+    float queuePriority = 0.5f;
     std::vector<vk::QueueFamilyProperties> queueFamilyProperties = physicalDevice.getQueueFamilyProperties();
-   
+    
     auto graphicsQueueFamilyProperty = std::ranges::find_if( queueFamilyProperties, [] (auto const &qfp) { return ( qfp.queueFlags & vk::QueueFlagBits::eGraphics) != static_cast<vk::QueueFlagBits>(0); } );
     auto graphicIndex = static_cast<uint32_t>(std::distance(queueFamilyProperties.begin(), graphicsQueueFamilyProperty)) ;
-    
     
     vk::DeviceQueueCreateInfo queueInfo  = 
     {
@@ -195,5 +195,14 @@ void Renderer::createlogicalDevice()
         .queueCount = 1,
         .pQueuePriorities = &queuePriority
     };
-}
+ 
+    vk::StructureChain<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceVulkan11Features, vk::PhysicalDeviceVulkan13Features, vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT> featureChain = { {},{.shaderDrawParameters = true},{.dynamicRendering = true},{.extendedDynamicState = true}};
+    
+    std::vector requiredDeviceExtensions = { vk::KHRSwapchainExtensionName};
+    
+    vk::DeviceCreateInfo deviceCreateInfo { .pNext = &featureChain.get<vk::PhysicalDeviceFeatures2>(), .queueCreateInfoCount = 1, .pQueueCreateInfos = &queueInfo, .enabledExtensionCount = static_cast<uint32_t>(requiredDeviceExtensions.size()), .ppEnabledExtensionNames = requiredDeviceExtensions.data()};
 
+    device = vk::raii::Device(physicalDevice, deviceCreateInfo);
+    graphicQueue = vk::raii::Queue(device, graphicIndex, 0);
+}
+ 
