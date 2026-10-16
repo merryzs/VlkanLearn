@@ -192,6 +192,7 @@ bool Renderer::CheckDeviceSuitability(vk::raii::PhysicalDevice const& physicalDe
 
 void Renderer::createlogicalDevice()
 {
+   
     std::vector<vk::QueueFamilyProperties> queueFamilyProperties = physicalDevice.getQueueFamilyProperties();
     
     uint32_t queueIndex = ~0;
@@ -211,7 +212,7 @@ void Renderer::createlogicalDevice()
     
     float queuePriority = 0.5f;
     vk::DeviceQueueCreateInfo queueInfo  { .queueFamilyIndex = queueIndex, .queueCount = 1, .pQueuePriorities = &queuePriority };
-    vk::DeviceCreateInfo deviceCreateInfo { .pNext = &featureChain.get<vk::PhysicalDeviceFeatures2>(), .queueCreateInfoCount = 1, .pQueueCreateInfos = &queueInfo, .enabledExtensionCount = static_cast<uint32_t>( GetRequiredExtensions().size()), .ppEnabledExtensionNames =  GetRequiredExtensions().data()};
+    vk::DeviceCreateInfo deviceCreateInfo { .pNext = &featureChain.get<vk::PhysicalDeviceFeatures2>(), .queueCreateInfoCount = 1, .pQueueCreateInfos = &queueInfo, .enabledExtensionCount = static_cast<uint32_t>( requiredDeviceExtension().size()), .ppEnabledExtensionNames = requiredDeviceExtension().data()};
 
     device = vk::raii::Device(physicalDevice, deviceCreateInfo);
     graphicQueue = vk::raii::Queue(device, queueIndex, 0);

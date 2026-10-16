@@ -31,4 +31,6 @@ private :
     
     static VKAPI_ATTR vk::Bool32 VKAPI_CALL debug_report_callback(vk::DebugUtilsMessageSeverityFlagBitsEXT severity, vk::DebugUtilsMessageTypeFlagsEXT type, const vk::DebugUtilsMessengerCallbackDataEXT* callback, void* );
     bool CheckDeviceSuitability(vk::raii::PhysicalDevice const&physicalDevice);
+    std::vector<const char*> requiredDeviceExtension = {
+        vk::KHRSwapchainExtensionName};
 };
