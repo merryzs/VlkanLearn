@@ -88,6 +88,7 @@ void Renderer::createInstance()
     setupDebugMessenger();
     pickPhysicalDevice();
     createlogicalDevice();
+    createSurface();
 }
 
 std::vector<char const*> Renderer::GetRequiredExtensions()
@@ -103,6 +104,12 @@ std::vector<char const*> Renderer::GetRequiredExtensions()
     return extensions;
 }
 
+vk::Bool32 Renderer::debug_report_callback(vk::DebugUtilsMessageSeverityFlagBitsEXT severity, vk::DebugUtilsMessageTypeFlagsEXT type, const vk::DebugUtilsMessengerCallbackDataEXT* data, void*)
+{
+    std::cout << "Validation layer: [" << vk::to_string(type) << "] message : " << data->pMessage << std::endl;
+    
+    return vk::False;
+}
 
 std::vector<const char*> Renderer::GetRequiredLayers()
 {
@@ -121,28 +128,30 @@ void Renderer::setupDebugMessenger()
 {
     vk::DebugUtilsMessageSeverityFlagsEXT severityFlags(vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError);
     
-    vk::DebugUtilsMessageTypeFlagsEXT typeFlags( vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation );
+    vk::DebugUtilsMessageTypeFlagsEXT typeFlags( vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral| vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation );
     
     vk::DebugUtilsMessengerCreateInfoEXT createInfo
     {
         .messageSeverity = severityFlags,
         .messageType = typeFlags,
-        .pfnUserCallback = &DebugReportCallback,
+        .pfnUserCallback = &debug_report_callback
     };
     
-    debugMessenger = instance.createDebugUtilsMessengerEXT(createInfo);
-}
+    try
+    {
+        debugMessenger = instance.createDebugUtilsMessengerEXT(createInfo);
+    }
+    catch (std::exception e)
+    {
+        std::cout << e.what() << std::endl;
+    }
 
-
-vk::Bool32 Renderer::DebugReportCallback(vk::DebugUtilsMessageSeverityFlagBitsEXT severity, vk::DebugUtilsMessageTypeFlagsEXT type, const vk::DebugUtilsMessengerCallbackDataEXT* callback, void*)
-{
-    std::cout << "Validation layer: [" << vk::to_string(type) << "] message : " << callback->pMessage << std::endl;
     
-    return vk::False;
 }
 
 
-std::vector requiresDeviceExtensions = {vk::KHRSwapchainExtensionName};
+
+
 
 
 void Renderer::pickPhysicalDevice()
@@ -167,7 +176,7 @@ bool Renderer::CheckDeviceSuitability(vk::raii::PhysicalDevice const& physicalDe
     bool supportsGraphics = std::ranges::any_of(QueueFamilies, [](auto const& qfp) {return !!( qfp.queueFlags & vk::QueueFlagBits::eGraphics); });
 
     auto availableDevicesExtensions = physicalDevice.enumerateDeviceExtensionProperties();
-    bool supportsAllRequiredExtentions = std::ranges::all_of(requiresDeviceExtensions, [&availableDevicesExtensions](auto const& requiredDeviceExtensions)
+    bool supportsAllRequiredExtentions = std::ranges::all_of(GetRequiredExtensions(), [&availableDevicesExtensions](auto const& requiredDeviceExtensions)
     {
         return std::ranges::any_of(availableDevicesExtensions, [requiredDeviceExtensions](auto const& availableDevicesExtensions) 
         { return strcmp( availableDevicesExtensions.extensionName, requiredDeviceExtensions) == 0; });
@@ -183,26 +192,42 @@ bool Renderer::CheckDeviceSuitability(vk::raii::PhysicalDevice const& physicalDe
 
 void Renderer::createlogicalDevice()
 {
-    float queuePriority = 0.5f;
     std::vector<vk::QueueFamilyProperties> queueFamilyProperties = physicalDevice.getQueueFamilyProperties();
     
-    auto graphicsQueueFamilyProperty = std::ranges::find_if( queueFamilyProperties, [] (auto const &qfp) { return ( qfp.queueFlags & vk::QueueFlagBits::eGraphics) != static_cast<vk::QueueFlagBits>(0); } );
-    auto graphicIndex = static_cast<uint32_t>(std::distance(queueFamilyProperties.begin(), graphicsQueueFamilyProperty)) ;
-    
-    vk::DeviceQueueCreateInfo queueInfo  = 
+    uint32_t queueIndex = ~0;
+    for (uint32_t qfpIndex = 0; qfpIndex < queueFamilyProperties.size(); ++qfpIndex)
     {
-        .queueFamilyIndex = graphicIndex,
-        .queueCount = 1,
-        .pQueuePriorities = &queuePriority
-    };
- 
+        if ((queueFamilyProperties[qfpIndex].queueFlags & vk::QueueFlagBits::eGraphics) && physicalDevice.getSurfaceSupportKHR(qfpIndex, *surface))
+        {
+            queueIndex = qfpIndex;
+            break;
+        }
+    }
+    if (queueIndex == ~0)
+    {
+        throw std::runtime_error( "Could not find a queue for graphics and present -> terminating" );
+    }
     vk::StructureChain<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceVulkan11Features, vk::PhysicalDeviceVulkan13Features, vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT> featureChain = { {},{.shaderDrawParameters = true},{.dynamicRendering = true},{.extendedDynamicState = true}};
     
-    std::vector requiredDeviceExtensions = { vk::KHRSwapchainExtensionName};
-    
-    vk::DeviceCreateInfo deviceCreateInfo { .pNext = &featureChain.get<vk::PhysicalDeviceFeatures2>(), .queueCreateInfoCount = 1, .pQueueCreateInfos = &queueInfo, .enabledExtensionCount = static_cast<uint32_t>(requiredDeviceExtensions.size()), .ppEnabledExtensionNames = requiredDeviceExtensions.data()};
+    float queuePriority = 0.5f;
+    vk::DeviceQueueCreateInfo queueInfo  { .queueFamilyIndex = queueIndex, .queueCount = 1, .pQueuePriorities = &queuePriority };
+    vk::DeviceCreateInfo deviceCreateInfo { .pNext = &featureChain.get<vk::PhysicalDeviceFeatures2>(), .queueCreateInfoCount = 1, .pQueueCreateInfos = &queueInfo, .enabledExtensionCount = static_cast<uint32_t>( GetRequiredExtensions().size()), .ppEnabledExtensionNames =  GetRequiredExtensions().data()};
 
     device = vk::raii::Device(physicalDevice, deviceCreateInfo);
-    graphicQueue = vk::raii::Queue(device, graphicIndex, 0);
+    graphicQueue = vk::raii::Queue(device, queueIndex, 0);
 }
- 
+
+
+
+
+void Renderer::createSurface()
+{
+    vk::Win32SurfaceCreateInfoKHR createInfoSurface = {.hinstance = GetModuleHandle(nullptr), .hwnd = glfwGetWin32Window(window)};
+    surface = instance.createWin32SurfaceKHR(createInfoSurface);
+    VkSurfaceKHR _surface;
+    if (glfwCreateWindowSurface(*instance, window, nullptr, &_surface) != 0)
+    {
+        throw std::runtime_error("failed to create window surface!");
+    }
+    surface = vk::raii::SurfaceKHR( instance, _surface );
+}
