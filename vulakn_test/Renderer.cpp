@@ -4,6 +4,14 @@
 #include <iostream>
 #include <GLFW/glfw3.h>
 
+const std::vector validationLayers = {"VK_LAYER_KHRONOS_validation"};
+
+#ifdef NDEBUG 
+constexpr bool enableValidationLayers = false;
+#else 
+constexpr bool enableValidationLayers = true;
+#endif
+
 void Renderer::createInstance()
 {
    
@@ -37,11 +45,7 @@ void Renderer::createInstance()
     
     const std::vector validationLayers = {"VK_LAYER_KHRONOS_validation"};
     
-#ifdef NDEBUG
-    bool enableValidationLayers = false;
-#else 
-    bool enableValidationLayers = true;
-#endif
+
     
     std::vector<const char*> requiredLayer;
     
@@ -49,7 +53,6 @@ void Renderer::createInstance()
     {
         requiredLayers.assign_range(validationLayers);
     }
-    
     
     auto LayerProperties = context.enumerateInstanceLayerProperties();
     
@@ -71,9 +74,7 @@ void Renderer::createInstance()
         .enabledLayerCount = static_cast<uint32_t>(validationLayers.size()),
         .ppEnabledLayerNames = validationLayers.data(),
         .enabledExtensionCount = static_cast<uint32_t>(requiredExtensions.size()),
-        .ppEnabledExtensionNames = requiredExtensions.data(),
-        
-     
+        .ppEnabledExtensionNames = requiredExtensions.data()
     };
 
    try
@@ -96,7 +97,7 @@ std::vector<char const*> Renderer::GetRequiredExtensions()
     uint32_t glfw_extension_count = 0;
     auto glfwExtensions = glfwGetRequiredInstanceExtensions(&glfw_extension_count);
     
-    std::vector<const char*> required_extensions ={};
+    std::vector required_extensions ={ vk::EXTDebugUtilsExtensionName };
     std::vector extensions(glfwExtensions, glfwExtensions + glfw_extension_count);
     
     extensions.append_range(required_extensions);
@@ -104,7 +105,7 @@ std::vector<char const*> Renderer::GetRequiredExtensions()
     return extensions;
 }
 
-vk::Bool32 Renderer::debug_report_callback(vk::DebugUtilsMessageSeverityFlagBitsEXT severity, vk::DebugUtilsMessageTypeFlagsEXT type, const vk::DebugUtilsMessengerCallbackDataEXT* data, void*)
+vk::Bool32 Renderer::debugCallback(vk::DebugUtilsMessageSeverityFlagBitsEXT severity, vk::DebugUtilsMessageTypeFlagsEXT type, const vk::DebugUtilsMessengerCallbackDataEXT* data, void*)
 {
     std::cout << "Validation layer: [" << vk::to_string(type) << "] message : " << data->pMessage << std::endl;
     
@@ -124,8 +125,13 @@ std::vector<const char*> Renderer::GetRequiredLayers()
     return requiredLayers;
 }
 
+
+
 void Renderer::setupDebugMessenger()
 {
+    if (!enableValidationLayers)
+        return;
+    
     vk::DebugUtilsMessageSeverityFlagsEXT severityFlags(vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError);
     
     vk::DebugUtilsMessageTypeFlagsEXT typeFlags( vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral| vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation );
@@ -134,28 +140,55 @@ void Renderer::setupDebugMessenger()
     {
         .messageSeverity = severityFlags,
         .messageType = typeFlags,
-        .pfnUserCallback = &debug_report_callback
+        .pfnUserCallback = &debugCallback
     };
     
     try
     {
         debugMessenger = instance.createDebugUtilsMessengerEXT(createInfo);
     }
-    catch (std::exception e)
+    catch (std::exception& e)
     {
         std::cout << e.what() << std::endl;
     }
+}
 
-    
+void Renderer::createSurface()
+{
+    VkSurfaceKHR _surface;
+    if (glfwCreateWindowSurface(*instance, window, nullptr, &_surface) != 0)
+    {
+        throw std::runtime_error("failed to create window surface!");
+    }
+    surface = vk::raii::SurfaceKHR( instance, _surface );
 }
 
 
 
+bool Renderer::CheckDeviceSuitability(vk::raii::PhysicalDevice const& physicalDevice)
+{
+    bool supportsVulkan1_3 = physicalDevice.getProperties().apiVersion >= vk::ApiVersion13;
+    
+    auto QueueFamilies = physicalDevice.getQueueFamilyProperties();
+    bool supportsGraphics = std::ranges::any_of(QueueFamilies, [](auto const& qfp) {return !!( qfp.queueFlags & vk::QueueFlagBits::eGraphics); });
 
-
+    auto availableDevicesExtensions = physicalDevice.enumerateDeviceExtensionProperties();
+    bool supportsAllRequiredExtentions = std::ranges::all_of(requiredDeviceExtension, [&availableDevicesExtensions](auto const& requiredDeviceExtensions)
+    {
+        return std::ranges::any_of(availableDevicesExtensions, [requiredDeviceExtensions](auto const& availableDevicesExtensions) 
+        { return strcmp( availableDevicesExtensions.extensionName, requiredDeviceExtensions) == 0; });
+    } );
+    
+    auto features = physicalDevice.template getFeatures2<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceVulkan11Features, vk::PhysicalDeviceVulkan13Features, vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT> ();
+    
+    bool supportsRequiredFeatures = features.template get<vk::PhysicalDeviceVulkan11Features>().shaderDrawParameters && features.template get<vk::PhysicalDeviceVulkan13Features>().dynamicRendering && features.template get<vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>().extendedDynamicState;
+    
+    return supportsVulkan1_3 && supportsGraphics && supportsAllRequiredExtentions && supportsRequiredFeatures;
+}
 
 void Renderer::pickPhysicalDevice()
 {
+
     std::vector<vk::raii::PhysicalDevice> physicalDevices = instance.enumeratePhysicalDevices();
     
     auto const DevIt = std::ranges::find_if( physicalDevices, [&](auto const& physicalDevice) {return CheckDeviceSuitability( physicalDevice ); } );
@@ -168,31 +201,11 @@ void Renderer::pickPhysicalDevice()
 }
 
 
-bool Renderer::CheckDeviceSuitability(vk::raii::PhysicalDevice const& physicalDevice)
-{
-    bool CanUseVulkan1_3 = physicalDevice.getProperties().apiVersion >= vk::ApiVersion13;
-    
-    auto QueueFamilies = physicalDevice.getQueueFamilyProperties();
-    bool supportsGraphics = std::ranges::any_of(QueueFamilies, [](auto const& qfp) {return !!( qfp.queueFlags & vk::QueueFlagBits::eGraphics); });
 
-    auto availableDevicesExtensions = physicalDevice.enumerateDeviceExtensionProperties();
-    bool supportsAllRequiredExtentions = std::ranges::all_of(GetRequiredExtensions(), [&availableDevicesExtensions](auto const& requiredDeviceExtensions)
-    {
-        return std::ranges::any_of(availableDevicesExtensions, [requiredDeviceExtensions](auto const& availableDevicesExtensions) 
-        { return strcmp( availableDevicesExtensions.extensionName, requiredDeviceExtensions) == 0; });
-    } );
-    
-    auto features = physicalDevice.template getFeatures2<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceVulkan11Features, vk::PhysicalDeviceVulkan13Features, vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT> ();
-    
-    bool supportsRequiredFeatures = features.template get<vk::PhysicalDeviceVulkan11Features>().shaderDrawParameters && features.template get<vk::PhysicalDeviceVulkan13Features>().dynamicRendering && features.template get<vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>().extendedDynamicState;
-    
-    return CanUseVulkan1_3 && supportsGraphics && supportsAllRequiredExtentions && supportsRequiredFeatures;
-}
 
 
 void Renderer::createlogicalDevice()
 {
-   
     std::vector<vk::QueueFamilyProperties> queueFamilyProperties = physicalDevice.getQueueFamilyProperties();
     
     uint32_t queueIndex = ~0;
@@ -212,7 +225,7 @@ void Renderer::createlogicalDevice()
     
     float queuePriority = 0.5f;
     vk::DeviceQueueCreateInfo queueInfo  { .queueFamilyIndex = queueIndex, .queueCount = 1, .pQueuePriorities = &queuePriority };
-    vk::DeviceCreateInfo deviceCreateInfo { .pNext = &featureChain.get<vk::PhysicalDeviceFeatures2>(), .queueCreateInfoCount = 1, .pQueueCreateInfos = &queueInfo, .enabledExtensionCount = static_cast<uint32_t>( requiredDeviceExtension().size()), .ppEnabledExtensionNames = requiredDeviceExtension().data()};
+    vk::DeviceCreateInfo deviceCreateInfo { .pNext = &featureChain.get<vk::PhysicalDeviceFeatures2>(), .queueCreateInfoCount = 1, .pQueueCreateInfos = &queueInfo, .enabledExtensionCount = static_cast<uint32_t>( requiredDeviceExtension.size()), .ppEnabledExtensionNames = requiredDeviceExtension.data()};
 
     device = vk::raii::Device(physicalDevice, deviceCreateInfo);
     graphicQueue = vk::raii::Queue(device, queueIndex, 0);
@@ -220,15 +233,85 @@ void Renderer::createlogicalDevice()
 
 
 
-
-void Renderer::createSurface()
+    
+static uint32_t chooseSwapMinImageCount(vk::SurfaceCapabilitiesKHR const& surfaceCapabilities)
 {
-    vk::Win32SurfaceCreateInfoKHR createInfoSurface = {.hinstance = GetModuleHandle(nullptr), .hwnd = glfwGetWin32Window(window)};
-    surface = instance.createWin32SurfaceKHR(createInfoSurface);
-    VkSurfaceKHR _surface;
-    if (glfwCreateWindowSurface(*instance, window, nullptr, &_surface) != 0)
+    auto minImageCount = std::max(3u, surfaceCapabilities.minImageCount);
+    if ( (0 < surfaceCapabilities.maxImageCount) && (surfaceCapabilities.maxImageCount < minImageCount))
     {
-        throw std::runtime_error("failed to create window surface!");
+        minImageCount = surfaceCapabilities.maxImageCount;
     }
-    surface = vk::raii::SurfaceKHR( instance, _surface );
+    return minImageCount;
 }
+    
+static vk::SurfaceFormatKHR chooseSwapSurfaceFormat(std::vector<vk::SurfaceFormatKHR> const& availableFormats)
+{
+    assert(!availableFormats.empty());
+    const auto formatIt = std::ranges::find_if(availableFormats, [](const auto &format) {return format.format == vk::Format::eB8G8R8A8Srgb && format.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear; });
+    return formatIt != availableFormats.end() ? *formatIt : availableFormats[0];
+}
+
+static vk::PresentModeKHR chooseSwapPresentMode(std::vector<vk::PresentModeKHR> const& availablePresentModes)
+{
+    assert(std::ranges::any_of(availablePresentModes, [] (auto presentMode) {return presentMode == vk::PresentModeKHR::eFifo;}));
+    return std::ranges::any_of(availablePresentModes, [] (const vk::PresentModeKHR value) {return vk::PresentModeKHR::eMailbox == value; }) ? vk::PresentModeKHR::eMailbox : vk::PresentModeKHR::eFifo;
+}
+    
+vk::Extent2D chooseSwapExtent(vk::SurfaceCapabilitiesKHR const& capabilities)
+{
+    if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
+    {
+        return capabilities.currentExtent;
+    }
+    int width, height;
+    glfwGetFramebufferSize( winddow, &width, &height );
+    
+    return { std::clamp<uint32_t>( width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width), (height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height)};
+}
+
+void Renderer::createSwapchain()
+{
+    vk::SurfaceCapabilitiesKHR surfaceCapabilities = physicalDevice.getSurfaceCapabilitiesKHR(*surface);
+    swapChainExtent = chooseSwapExtent(surfaceCapabilities);
+    uint32_t minImageCount = chooseSwapMinImageCount(surfaceCapabilities);
+    
+    std::vector<vk::SurfaceFormatKHR> availableFormats = physicalDevice.getSurfaceFormatsKHR(*surface);
+    swapChainSurfaceFormat = chooseSwapSurfaceFormat(availableFormats);
+    
+    std::vector<vk::PresentModeKHR> availablePresentModes = physicalDevice.getSurfacePresentModesKHR(*surface);
+    vk::PresentModeKHR presentMode = chooseSwapPresentMode(availablePresentModes);
+    
+    vk::SwapchainCreateInfoKHR swapchainCreateInfo = 
+    {
+        .surface = *surface,
+        .minImageCount = minImageCount,
+        .imageFormat = swapChainSurfaceFormat.format,
+        .imageColorSpace = swapChainSurfaceFormat.colorSpace,
+        .imageExtent = swapChainExtent,
+        .imageArrayLayers = 1,
+        .imageUsage = vk::ImageUsageFlagBits::eColorAttachment,
+        .imageSharingMode = vk::SharingMode::eExclusive,
+        .preTransform = surfaceCapabilities.currentTransform,
+        .compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque,
+        .presentMode = presentMode,
+        .clipped = true
+    };
+    
+    swapChain = vk::raii::SwapchainKHR(device, swapchainCreateInfo);
+    swapChainImages = swapChain.getImages();
+}
+
+std::vector<char const*> Renderer::GetRequiredInstanceExtensions()
+{
+    uint32_t glfwExtensionCount = 0;
+    auto glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+    
+    std::vector extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
+    if (enableValidationLayers)
+    {
+        extensions.push_back(vk::EXTDebugUtilsExtensionName);
+    }
+    return extensions;
+}
+
+

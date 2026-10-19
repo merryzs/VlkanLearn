@@ -2,6 +2,7 @@
 #include "dependency.h"
 
 
+
 class Renderer
 {
 public:
@@ -12,10 +13,13 @@ private :
     vk::raii::Context context;
     vk::raii::Instance instance = nullptr;
     vk::raii::DebugUtilsMessengerEXT debugMessenger = nullptr;
+    vk::raii::SurfaceKHR surface = nullptr;
     vk::raii::PhysicalDevice physicalDevice = nullptr;
     vk::raii::Device device = nullptr;
     vk::raii::Queue graphicQueue = nullptr;
-    vk::raii::SurfaceKHR surface = nullptr;
+    vk::raii::SwapchainKHR swapChain = nullptr;
+    vk::SurfaceFormatKHR swapChainSurfaceFormat;
+    vk::Extent2D swapChainExtent;
     
     
     
@@ -23,14 +27,18 @@ private :
     void pickPhysicalDevice();
     void createlogicalDevice();
     void createSurface();
+    void createSwapchain();
     
-    
+    std::vector<vk::Image>  swapChainImages;
+    std::vector<vk::raii::ImageView> swapChainImageViews;
+    std::vector<const char *> requiredDeviceExtension = {
+        vk::KHRSwapchainExtensionName};
     std::vector<char const*> GetRequiredExtensions(); 
     std::vector<char const*> GetRequiredLayers(); 
+    std::vector<char const*> GetRequiredInstanceExtensions();
+
     
     
-    static VKAPI_ATTR vk::Bool32 VKAPI_CALL debug_report_callback(vk::DebugUtilsMessageSeverityFlagBitsEXT severity, vk::DebugUtilsMessageTypeFlagsEXT type, const vk::DebugUtilsMessengerCallbackDataEXT* callback, void* );
+    static VKAPI_ATTR vk::Bool32 VKAPI_CALL debugCallback(vk::DebugUtilsMessageSeverityFlagBitsEXT severity, vk::DebugUtilsMessageTypeFlagsEXT type, const vk::DebugUtilsMessengerCallbackDataEXT* pCallbackData, void * );
     bool CheckDeviceSuitability(vk::raii::PhysicalDevice const&physicalDevice);
-    std::vector<const char*> requiredDeviceExtension = {
-        vk::KHRSwapchainExtensionName};
 };
