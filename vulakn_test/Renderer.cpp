@@ -90,6 +90,9 @@ void Renderer::createInstance()
     pickPhysicalDevice();
     createlogicalDevice();
     createSurface();
+    createSwapchain();
+    createImageViews();
+    createGraphicsPipeline();
 }
 
 std::vector<char const*> Renderer::GetRequiredExtensions()
@@ -256,23 +259,25 @@ static vk::PresentModeKHR chooseSwapPresentMode(std::vector<vk::PresentModeKHR> 
     assert(std::ranges::any_of(availablePresentModes, [] (auto presentMode) {return presentMode == vk::PresentModeKHR::eFifo;}));
     return std::ranges::any_of(availablePresentModes, [] (const vk::PresentModeKHR value) {return vk::PresentModeKHR::eMailbox == value; }) ? vk::PresentModeKHR::eMailbox : vk::PresentModeKHR::eFifo;
 }
-    
-vk::Extent2D chooseSwapExtent(vk::SurfaceCapabilitiesKHR const& capabilities)
+
+vk::Extent2D Renderer::chooseSwapExtent(vk::SurfaceCapabilitiesKHR const& capabilities)
 {
     if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
     {
         return capabilities.currentExtent;
     }
     int width, height;
-    glfwGetFramebufferSize( winddow, &width, &height );
+    glfwGetFramebufferSize( window, &width, &height );
     
-    return { std::clamp<uint32_t>( width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width), (height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height)};
+    return { 
+        std::clamp<uint32_t>(width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width), 
+        std::clamp<uint32_t>(height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height)};
 }
 
 void Renderer::createSwapchain()
 {
     vk::SurfaceCapabilitiesKHR surfaceCapabilities = physicalDevice.getSurfaceCapabilitiesKHR(*surface);
-    swapChainExtent = chooseSwapExtent(surfaceCapabilities);
+    swapChainExtent = chooseSwapExtent(surfaceCapabilities); 
     uint32_t minImageCount = chooseSwapMinImageCount(surfaceCapabilities);
     
     std::vector<vk::SurfaceFormatKHR> availableFormats = physicalDevice.getSurfaceFormatsKHR(*surface);
@@ -281,24 +286,23 @@ void Renderer::createSwapchain()
     std::vector<vk::PresentModeKHR> availablePresentModes = physicalDevice.getSurfacePresentModesKHR(*surface);
     vk::PresentModeKHR presentMode = chooseSwapPresentMode(availablePresentModes);
     
-    vk::SwapchainCreateInfoKHR swapchainCreateInfo = 
-    {
-        .surface = *surface,
-        .minImageCount = minImageCount,
-        .imageFormat = swapChainSurfaceFormat.format,
-        .imageColorSpace = swapChainSurfaceFormat.colorSpace,
-        .imageExtent = swapChainExtent,
-        .imageArrayLayers = 1,
-        .imageUsage = vk::ImageUsageFlagBits::eColorAttachment,
-        .imageSharingMode = vk::SharingMode::eExclusive,
-        .preTransform = surfaceCapabilities.currentTransform,
-        .compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque,
-        .presentMode = presentMode,
-        .clipped = true
-    };
+    vk::SwapchainCreateInfoKHR swapchainCreateInfo = { .surface = *surface, .minImageCount = minImageCount, .imageFormat = swapChainSurfaceFormat.format, .imageColorSpace = swapChainSurfaceFormat.colorSpace, .imageExtent = swapChainExtent, .imageArrayLayers = 1, .imageUsage = vk::ImageUsageFlagBits::eColorAttachment, .imageSharingMode = vk::SharingMode::eExclusive, .preTransform = surfaceCapabilities.currentTransform, .compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque, .presentMode = presentMode, .clipped = true};
     
     swapChain = vk::raii::SwapchainKHR(device, swapchainCreateInfo);
     swapChainImages = swapChain.getImages();
+}
+
+void Renderer::createImageViews()
+{
+    assert(swapChainImageViews.empty());
+    
+    vk::ImageViewCreateInfo imageViewCreateInfo = { .viewType = vk::ImageViewType::e2D, .format = swapChainSurfaceFormat.format, .subresourceRange = {vk::ImageAspectFlagBits::eColor,0,1,0,1}};
+
+    for (auto &image : swapChainImages)
+    {
+        imageViewCreateInfo.image = image;
+        swapChainImageViews.emplace_back(device, imageViewCreateInfo);
+    }
 }
 
 std::vector<char const*> Renderer::GetRequiredInstanceExtensions()
@@ -313,5 +317,24 @@ std::vector<char const*> Renderer::GetRequiredInstanceExtensions()
     }
     return extensions;
 }
+
+
+[[nodiscard]] vk::raii::ShaderModule Renderer::createShaderModule(const std::vector<char> &code) const
+{
+    vk::ShaderModuleCreateInfo CreateInfo = { .codeSize = code.size() * sizeof(char), .pCode = reinterpret_cast<const uint32_t*>(code.data()) };
+    vk::raii::ShaderModule shaderModule{ device, CreateInfo };
+    
+    return shaderModule;
+}
+
+void Renderer::createGraphicsPipeline()
+{
+    vk::raii::ShaderModule shaderModule = createShaderModule(ReadFile("shaders/slang.spv"));
+    
+    vk::PipelineShaderStageCreateInfo vertShaderStageInfo{.stage = vk::ShaderStageFlagBits::eVertex, .module = shaderModule, .pName = "vertMain"};
+    vk::PipelineShaderStageCreateInfo fragShaderStageInfo{.stage = vk::ShaderStageFlagBits::eFragment, .module = shaderModule, .pName = "fragMain"};
+    vk::PipelineShaderStageCreateInfo ShaderStage[] = {vertShaderStageInfo, fragShaderStageInfo};
+}
+
 
 
