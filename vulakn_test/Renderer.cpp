@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <GLFW/glfw3.h>
+#include <fstream>
 
 const std::vector validationLayers = {"VK_LAYER_KHRONOS_validation"};
 
@@ -329,7 +330,7 @@ std::vector<char const*> Renderer::GetRequiredInstanceExtensions()
 
 void Renderer::createGraphicsPipeline()
 {
-    vk::raii::ShaderModule shaderModule = createShaderModule(ReadFile("shaders/slang.spv"));
+    vk::raii::ShaderModule shaderModule = createShaderModule(readFile("shaders/slang.spv"));
     
     vk::PipelineShaderStageCreateInfo vertShaderStageInfo{.stage = vk::ShaderStageFlagBits::eVertex, .module = shaderModule, .pName = "vertMain"};
     vk::PipelineShaderStageCreateInfo fragShaderStageInfo{.stage = vk::ShaderStageFlagBits::eFragment, .module = shaderModule, .pName = "fragMain"};
@@ -337,4 +338,17 @@ void Renderer::createGraphicsPipeline()
 }
 
 
-
+std::vector<char> Renderer::readFile(const std::string &filename)
+{
+    std::ifstream file(filename, std::ios::ate | std::ios::binary);
+   
+    if (!file.is_open())
+    {
+        throw std::runtime_error("Could not open file!");
+    }
+    std::vector<char> buffer(file.tellg());
+    file.seekg(0, std::ios::beg);
+    file.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
+    file.close();
+    return buffer;
+}

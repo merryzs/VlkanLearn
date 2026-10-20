@@ -38,7 +38,8 @@ private :
     std::vector<char const*> GetRequiredExtensions(); 
     std::vector<char const*> GetRequiredLayers(); 
     std::vector<char const*> GetRequiredInstanceExtensions();
-
+    static std::vector<char> readFile(const std::string &filename);
+    
     vk::Extent2D chooseSwapExtent(vk::SurfaceCapabilitiesKHR const& capabilities);
     vk::raii::ShaderModule createShaderModule(const std::vector<char> &code) const;
     
