@@ -14,7 +14,6 @@ void Application::Run()
     while (!glfwWindowShouldClose(window))
     {
         glfwPollEvents();
-        renderer = new Renderer();
         renderer->drawFrame();
     }
 }
@@ -41,6 +40,8 @@ void Application::DestroyWindow()
 
 void Application::DestroyVulkan()
 {
+    delete renderer;
+    renderer = nullptr;
 }
 
 void Application::InitWindow()

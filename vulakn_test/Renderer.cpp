@@ -94,6 +94,7 @@ void Renderer::createInstance()
     createGraphicsPipeline();
     createCommandPool();
     createCommandBuffers();
+    createSyncObjects();
 }
 
 void Renderer::setupDebugMessenger()
@@ -108,15 +109,8 @@ void Renderer::setupDebugMessenger()
         .messageType = typeFlags,
         .pfnUserCallback = &debugCallback
     };
-    
-    try
-    {
         debugMessenger = instance.createDebugUtilsMessengerEXT(createInfo);
-    }
-    catch (std::exception& e)
-    {
-        std::cout << e.what() << '\n';
-    }
+  
 }
 
 void Renderer::pickPhysicalDevice()
@@ -165,20 +159,12 @@ void Renderer::createlogicalDevice()
 void Renderer::createSurface()
 {
     VkSurfaceKHR _surface;
-    try
-    {
+  
         if (glfwCreateWindowSurface(*instance, window, nullptr, &_surface) != 0)
         {
             throw std::runtime_error("failed to create window surface!");
         }
         surface = vk::raii::SurfaceKHR( instance, _surface );
-    }
-    catch (std::exception& e)
-    {
-        std::cout << e.what() << '\n';
-    }
-  
-    
 }
 
 void Renderer::createSwapchain()
@@ -298,8 +284,7 @@ void Renderer::createSyncObjects()
 
 void Renderer::drawFrame()
 {
-    vk::Result fenceResult;
-    fenceResult = device.waitForFences(*drawFence, vk::True, UINT64_MAX);
+    vk::Result fenceResult = device.waitForFences(*drawFence, vk::True, UINT64_MAX);
     if (fenceResult != vk::Result::eSuccess)
     {
         throw std::runtime_error("failed to wait for fence!");
