@@ -18,6 +18,7 @@ private :
     vk::raii::Device device = nullptr;
     vk::raii::Queue graphicQueue = nullptr;
     vk::raii::SwapchainKHR swapChain = nullptr;
+    vk::raii::PipelineLayout pipelineLayout = nullptr;
    
     vk::SurfaceFormatKHR swapChainSurfaceFormat;
     vk::Extent2D swapChainExtent;
@@ -45,4 +46,11 @@ private :
     
     static VKAPI_ATTR vk::Bool32 VKAPI_CALL debugCallback(vk::DebugUtilsMessageSeverityFlagBitsEXT severity, vk::DebugUtilsMessageTypeFlagsEXT type, const vk::DebugUtilsMessengerCallbackDataEXT* pCallbackData, void * );
     bool CheckDeviceSuitability(vk::raii::PhysicalDevice const&physicalDevice);
+    
+    
+    static uint32_t chooseSwapMinImageCount(vk::SurfaceCapabilitiesKHR const& surfaceCapabilities);
+    static vk::SurfaceFormatKHR chooseSwapSurfaceFormat(std::vector<vk::SurfaceFormatKHR> const& availableFormats);
+    static vk::PresentModeKHR chooseSwapPresentMode(std::vector<vk::PresentModeKHR> const& availablePresentModes);
+
+
 };
