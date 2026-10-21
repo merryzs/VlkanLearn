@@ -2,7 +2,6 @@
 #include "dependency.h"
 
 
-
 class Renderer
 {
 public:
@@ -10,6 +9,8 @@ public:
     void drawFrame();
 
     GLFWwindow* window = nullptr;
+    int width = 800;
+    int height = 600;
     
 private : 
     vk::raii::Context context;
@@ -23,25 +24,36 @@ private :
     vk::raii::PipelineLayout pipelineLayout = nullptr;
     vk::raii::Pipeline graphicsPipeline = nullptr;
     vk::raii::CommandPool commandPool = nullptr;
-    vk::raii::CommandBuffer commandBuffer = nullptr;
+
+    vk::raii::Buffer vertexBuffer = nullptr;
+    vk::raii::DeviceMemory vertexBufferMemory = nullptr;
     
-    vk::raii::Semaphore presentCompletSemaphore = nullptr;
-    vk::raii::Semaphore renderCompleteSemaphore = nullptr;
-    vk::raii::Fence drawFence = nullptr;
+    std::vector<vk::raii::Semaphore> presentCompletSemaphores;
+    std::vector<vk::raii::Semaphore> renderCompleteSemaphores;
+    std::vector<vk::raii::Fence> drawFence;
    
     vk::SurfaceFormatKHR swapChainSurfaceFormat;
     vk::Extent2D swapChainExtent;
     
     uint32_t queueIndex = ~0;
+    uint32_t frameIndex = 0;
+    static constexpr  int MAX_FRAMES_IN_FLIGHT = 2;
+    uint32_t findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties);
+
+
+    static void framebufferResizeCallback(GLFWwindow* window, int width, int height);
     
     void setupDebugMessenger();
     void pickPhysicalDevice();
     void createlogicalDevice();
     void createSurface();
+    void cleanupSwapChain();
+    void recreateSwapChain();
     void createSwapchain();
     void createImageViews();
     void createGraphicsPipeline();
     void createCommandPool();
+    void createVertexBuffer();
     void createCommandBuffers();
     void recordCommandBuffer(uint32_t imageIndex);
     void transition_image_layout(uint32_t imageIndex, vk::ImageLayout old_layout, vk::ImageLayout new_layout, vk::AccessFlags2 src_access_mask, vk::AccessFlags2 dst_access_mask, vk::PipelineStageFlags2 src_stage_mask, vk::PipelineStageFlags2 dst_stage_mask);
@@ -50,7 +62,8 @@ private :
     
     std::vector<vk::Image> swapChainImages;
     std::vector<vk::raii::ImageView> swapChainImageViews;
-   
+    std::vector<vk::raii::CommandBuffer> commandBuffers;
+    
     std::vector<const char *> requiredDeviceExtension = {
         vk::KHRSwapchainExtensionName};
    static std::vector<char const*> GetRequiredExtensions(); 
@@ -63,7 +76,7 @@ private :
     
     static VKAPI_ATTR vk::Bool32 VKAPI_CALL debugCallback(vk::DebugUtilsMessageSeverityFlagBitsEXT severity, vk::DebugUtilsMessageTypeFlagsEXT type, const vk::DebugUtilsMessengerCallbackDataEXT* pCallbackData, void * );
     bool CheckDeviceSuitability(vk::raii::PhysicalDevice const&physicalDevice);
-    
+    bool framebufferResized = false;
     
     static uint32_t chooseSwapMinImageCount(vk::SurfaceCapabilitiesKHR const& surfaceCapabilities);
     static vk::SurfaceFormatKHR chooseSwapSurfaceFormat(std::vector<vk::SurfaceFormatKHR> const& availableFormats);

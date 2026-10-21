@@ -1,6 +1,7 @@
 ﻿#include "Renderer.h"
 #include "debug.h"
 #include "application.h"
+#include "vertex.h"
 
 #include <iostream>
 #include <GLFW/glfw3.h>
@@ -14,11 +15,23 @@
 #include <vector>
 
 
+
 #ifdef NDEBUG 
 constexpr bool enableValidationLayers = false;
 #else 
 constexpr bool enableValidationLayers = true;
 #endif
+
+
+
+
+
+const std::vector<Vertex> vertices = {
+    {{0.0f, -0.5f}, {1.0f,1.0f, 1.0f}},
+    {{0.5f, 0.5f}, {0.0f,1.0f,0.0f}},
+    {{-0.5f, 0.5f}, {0.0f,0.0f,1.0f}}};
+
+
 
 void Renderer::createInstance()
 {
@@ -93,8 +106,17 @@ void Renderer::createInstance()
     createImageViews();
     createGraphicsPipeline();
     createCommandPool();
+    createVertexBuffer();
     createCommandBuffers();
     createSyncObjects();
+}
+
+
+
+void Renderer::framebufferResizeCallback(GLFWwindow* window, int width, int height)
+{
+    auto app =reinterpret_cast<Renderer*>(glfwGetWindowUserPointer(window));
+    app->framebufferResized = true;
 }
 
 void Renderer::setupDebugMessenger()
@@ -167,6 +189,33 @@ void Renderer::createSurface()
         surface = vk::raii::SurfaceKHR( instance, _surface );
 }
 
+void Renderer::cleanupSwapChain()
+{
+    swapChainImageViews.clear();
+    swapChain = nullptr;
+}
+
+void Renderer::recreateSwapChain()
+{
+    int width = 0, height = 0;
+    glfwGetFramebufferSize(window, &width, &height);
+    while ((width == 0) || (height == 0) && !glfwWindowShouldClose(window))
+    {
+        glfwGetFramebufferSize(window, &width, &height);
+        glfwWaitEvents();
+    }
+    if (glfwWindowShouldClose(window))
+    {
+        return;
+    }
+    
+    device.waitIdle();
+    cleanupSwapChain();
+    
+    createSwapchain();
+    createImageViews();
+}
+
 void Renderer::createSwapchain()
 {
     vk::SurfaceCapabilitiesKHR surfaceCapabilities = physicalDevice.getSurfaceCapabilitiesKHR(*surface);
@@ -208,7 +257,11 @@ void Renderer::createGraphicsPipeline()
     vk::PipelineShaderStageCreateInfo fragShaderStageInfo{.stage = vk::ShaderStageFlagBits::eFragment, .module = shaderModule, .pName = "fragMain"};
     vk::PipelineShaderStageCreateInfo ShaderStage[] = {vertShaderStageInfo, fragShaderStageInfo};
     
-    vk::PipelineVertexInputStateCreateInfo vertexInputInfo;
+    auto bindingDescription = Vertex::getBindingDescription();
+    auto attributeDescriptions = Vertex::getAttributeDescriptions();
+    
+    vk::PipelineVertexInputStateCreateInfo vertexInputInfo{.vertexBindingDescriptionCount = 1, .pVertexBindingDescriptions = &bindingDescription,
+        .vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size()), .pVertexAttributeDescriptions = attributeDescriptions.data() };
     vk::PipelineInputAssemblyStateCreateInfo inputAssembly{.topology = vk::PrimitiveTopology::eTriangleList};
     vk::PipelineViewportStateCreateInfo viewportState{.viewportCount = 1, .scissorCount = 1};
     
@@ -238,14 +291,48 @@ void Renderer::createCommandPool()
     vk::CommandPoolCreateInfo poolCreateInfo{ .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer, .queueFamilyIndex = queueIndex };
     commandPool = vk::raii::CommandPool(device, poolCreateInfo);
 }
+
+void Renderer::createVertexBuffer()
+{
+    vk::BufferCreateInfo bufferInfo{.size = sizeof(vertices[0]) * vertices.size(), .usage = vk::BufferUsageFlagBits::eVertexBuffer, .sharingMode =  vk::SharingMode::eExclusive};
+    vertexBuffer = vk::raii::Buffer(device, bufferInfo);
+    
+    vk::MemoryRequirements memoryRequirements = vertexBuffer.getMemoryRequirements();
+    vk::MemoryAllocateInfo memoryAllocateInfo{.allocationSize =  memoryRequirements.size, .memoryTypeIndex = findMemoryType(memoryRequirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent)};
+    
+    vertexBufferMemory = vk::raii::DeviceMemory(device, memoryAllocateInfo);
+    vertexBuffer.bindMemory(*vertexBufferMemory, 0);
+
+    void* data = vertexBufferMemory.mapMemory(0, bufferInfo.size);
+    memcpy(data, vertices.data(), bufferInfo.size);
+    vertexBufferMemory.unmapMemory();
+}
+
+uint32_t Renderer::findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties)
+{
+    vk::PhysicalDeviceMemoryProperties memoryProperties = physicalDevice.getMemoryProperties();
+    
+    for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; i++)
+    {
+        if ((typeFilter & (1<<i)) && (memoryProperties.memoryTypes[i].propertyFlags & properties) == properties)
+        {
+            return i;
+        }
+    }
+    throw std::runtime_error("failed to find a suitable memory type!");
+}
+
+
 void Renderer::createCommandBuffers()
 {
-    vk::CommandBufferAllocateInfo allocInfo{.commandPool = commandPool, .level = vk::CommandBufferLevel::ePrimary, .commandBufferCount = 1};
-    commandBuffer = std::move(vk::raii::CommandBuffers(device, allocInfo).front());
+    commandBuffers.clear();
+    vk::CommandBufferAllocateInfo allocInfo{.commandPool = commandPool, .level = vk::CommandBufferLevel::ePrimary, .commandBufferCount = MAX_FRAMES_IN_FLIGHT};
+    commandBuffers = vk::raii::CommandBuffers(device, allocInfo);
 }
 
 void Renderer::recordCommandBuffer(uint32_t imageIndex)
 {
+    auto &commandBuffer = commandBuffers[frameIndex];
     commandBuffer.begin({});
     
         transition_image_layout( imageIndex, vk::ImageLayout::eUndefined, vk::ImageLayout::eColorAttachmentOptimal, {}, vk::AccessFlagBits2::eColorAttachmentWrite, vk::PipelineStageFlagBits2::eColorAttachmentOutput, vk::PipelineStageFlagBits2::eColorAttachmentOutput);
@@ -261,6 +348,7 @@ void Renderer::recordCommandBuffer(uint32_t imageIndex)
 		commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *graphicsPipeline);
 		commandBuffer.setViewport(0, vk::Viewport(0.0f, 0.0f, static_cast<float>(swapChainExtent.width), static_cast<float>(swapChainExtent.height), 0.0f, 1.0f));
 		commandBuffer.setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), swapChainExtent));
+        commandBuffer.bindVertexBuffers(0, *vertexBuffer, {0}),
 		commandBuffer.draw(3, 1, 0, 0);
 		commandBuffer.endRendering();
 
@@ -272,47 +360,66 @@ void Renderer::transition_image_layout( uint32_t imageIndex, vk::ImageLayout old
 {
     vk::ImageMemoryBarrier2 barrier = { .srcStageMask = src_stage_mask, .srcAccessMask = src_access_mask, .dstStageMask = dst_stage_mask, .dstAccessMask = dst_access_mask, .oldLayout = old_layout, .newLayout = new_layout, .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, .image = swapChainImages[imageIndex], .subresourceRange ={ .aspectMask = vk::ImageAspectFlagBits::eColor, .baseMipLevel   = 0, .levelCount     = 1, .baseArrayLayer = 0, .layerCount     = 1}};
     vk::DependencyInfo dependency_info = { .dependencyFlags = {}, .imageMemoryBarrierCount = 1, .pImageMemoryBarriers = &barrier};
-    commandBuffer.pipelineBarrier2(dependency_info);
+    commandBuffers[frameIndex].pipelineBarrier2(dependency_info);
 }
 
 void Renderer::createSyncObjects()
 {
-    presentCompletSemaphore = vk::raii::Semaphore(device, vk::SemaphoreCreateInfo());
-    renderCompleteSemaphore = vk::raii::Semaphore(device, vk::SemaphoreCreateInfo());
-    drawFence = vk::raii::Fence(device, {.flags = vk::FenceCreateFlagBits::eSignaled});
+    assert(presentCompletSemaphores.empty() && renderCompleteSemaphores.empty() && drawFence.empty());
+    for (size_t i = 0 ; i < swapChainImages.size() ; i++)
+    {
+        renderCompleteSemaphores.emplace_back(device, vk::SemaphoreCreateInfo());
+    }
+    for (size_t i = 0 ; i < MAX_FRAMES_IN_FLIGHT ; i++)
+    {
+        presentCompletSemaphores.emplace_back(device, vk::SemaphoreCreateInfo());
+        drawFence.emplace_back(device, vk::FenceCreateInfo{.flags = vk::FenceCreateFlagBits::eSignaled});
+    }
+    
 }
 
 void Renderer::drawFrame()
 {
-    vk::Result fenceResult = device.waitForFences(*drawFence, vk::True, UINT64_MAX);
+    auto fenceResult = device.waitForFences(*drawFence[frameIndex], vk::True, UINT64_MAX);
     if (fenceResult != vk::Result::eSuccess)
     {
         throw std::runtime_error("failed to wait for fence!");
     }
-    device.resetFences(*drawFence);
+    device.resetFences(*drawFence[frameIndex]);
     
-    auto [result, imageIndex] = swapChain.acquireNextImage(UINT64_MAX, *presentCompletSemaphore, nullptr);
+    auto [result, imageIndex] = swapChain.acquireNextImage(UINT64_MAX, *presentCompletSemaphores[frameIndex], nullptr);
+    
+    if (result == vk::Result::eErrorOutOfDateKHR)
+    {
+        recreateSwapChain();
+        return;
+    }
+    
+    if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR)
+    {
+        assert(result == vk::Result::eTimeout || result == vk::Result::eNotReady);
+        throw std::runtime_error("failed to acquire swap chain image!");
+    }
+    commandBuffers[frameIndex].reset();
     recordCommandBuffer(imageIndex);
-    graphicQueue.waitIdle();
     
     vk::PipelineStageFlags waitDestinationStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
-    const vk::SubmitInfo submitInfo{ .waitSemaphoreCount = 1, .pWaitSemaphores = &*renderCompleteSemaphore, .pWaitDstStageMask = &waitDestinationStageMask, .commandBufferCount = 1, .pCommandBuffers = &*commandBuffer, .signalSemaphoreCount = 1, .pSignalSemaphores = &*renderCompleteSemaphore};
-    graphicQueue.submit(submitInfo, *drawFence);
+    const vk::SubmitInfo submitInfo{ .waitSemaphoreCount = 1, .pWaitSemaphores = &*presentCompletSemaphores[frameIndex], .pWaitDstStageMask = &waitDestinationStageMask, .commandBufferCount = 1, .pCommandBuffers = &*commandBuffers[frameIndex], .signalSemaphoreCount = 1, .pSignalSemaphores = &*renderCompleteSemaphores[imageIndex]};
+    graphicQueue.submit(submitInfo, *drawFence[frameIndex]);
     
-    const vk::PresentInfoKHR presentInfoKHR{ .waitSemaphoreCount = 1, .pWaitSemaphores = &*renderCompleteSemaphore, .swapchainCount = 1, .pSwapchains = &*swapChain, .pImageIndices = &imageIndex };
+    const vk::PresentInfoKHR presentInfoKHR{ .waitSemaphoreCount = 1, .pWaitSemaphores = &*renderCompleteSemaphores[imageIndex], .swapchainCount = 1, .pSwapchains = &*swapChain, .pImageIndices = &imageIndex };
     result = graphicQueue.presentKHR(presentInfoKHR);
     
-    switch (result)
+    if ((result == vk::Result::eSuboptimalKHR) || (result == vk::Result::eErrorOutOfDateKHR) || framebufferResized)
     {
-    case vk::Result::eSuccess:
-        break;
-        
-    case vk::Result::eSuboptimalKHR : 
-        std::cout << "vk::graphicQueue::PresentKHR returned vk::Result::eSuboptimalKHR << !\n";
-        
-    default :
-        break;
+        framebufferResized = false;
+        recreateSwapChain();
     }
+    else
+    {
+        assert(result == vk::Result::eSuccess);
+    }
+    frameIndex = (frameIndex + 1) % MAX_FRAMES_IN_FLIGHT;
     
 }
 
