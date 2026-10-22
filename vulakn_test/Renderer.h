@@ -42,10 +42,13 @@ private :
     vk::raii::DescriptorPool descriptorPool = nullptr;
     std::vector<vk::raii::DescriptorSet> descriptorSets ;
     
+    
     std::vector<vk::raii::Buffer> uniformeBuffer;
     std::vector<vk::raii::DeviceMemory> uniformBufferMemory;
     std::vector<void *> uniformBufferMapped;
    
+    std::vector<const char*> requiredLayer;
+
     vk::SurfaceFormatKHR swapChainSurfaceFormat;
     vk::Extent2D swapChainExtent;
     

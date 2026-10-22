@@ -66,7 +66,6 @@ void Renderer::createInstance()
     
 
     
-    std::vector<const char*> requiredLayer;
     
     if (debug::EnableDebug)
     {
@@ -203,7 +202,7 @@ void Renderer::recreateSwapChain()
 {
     int width = 0, height = 0;
     glfwGetFramebufferSize(window, &width, &height);
-    while ((width == 0) || (height == 0) && !glfwWindowShouldClose(window))
+    while ((width == 0 || height == 0) && !glfwWindowShouldClose(window))
     {
         glfwGetFramebufferSize(window, &width, &height);
         glfwWaitEvents();
@@ -276,7 +275,7 @@ void Renderer::createGraphicsPipeline()
     vk::PipelineInputAssemblyStateCreateInfo inputAssembly{.topology = vk::PrimitiveTopology::eTriangleList};
     vk::PipelineViewportStateCreateInfo viewportState{.viewportCount = 1, .scissorCount = 1};
     
-    vk::PipelineRasterizationStateCreateInfo rasterizer{ .depthClampEnable = vk::False, .rasterizerDiscardEnable = vk::False, .polygonMode = vk::PolygonMode::eFill, .cullMode = vk::CullModeFlagBits::eBack, .frontFace = vk::FrontFace::eClockwise, .depthBiasEnable = vk::False, .lineWidth = 1.0f};
+    vk::PipelineRasterizationStateCreateInfo rasterizer{ .depthClampEnable = vk::False, .rasterizerDiscardEnable = vk::False, .polygonMode = vk::PolygonMode::eFill, .cullMode = vk::CullModeFlagBits::eBack, .frontFace = vk::FrontFace::eCounterClockwise, .depthBiasEnable = vk::False, .lineWidth = 1.0f};
     
     vk::PipelineMultisampleStateCreateInfo multisampling{ .rasterizationSamples = vk::SampleCountFlagBits::e1, .sampleShadingEnable = vk::False};
     vk::PipelineColorBlendAttachmentState colorBlendAttachment{.blendEnable = vk::False, .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA};
@@ -411,7 +410,7 @@ void Renderer::recordCommandBuffer(uint32_t imageIndex)
 
 		commandBuffer.beginRendering(renderingInfo);
 		commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *graphicsPipeline);
-		commandBuffer.setViewport(0, vk::Viewport(0.0f, 0.0f, static_cast<float>(swapChainExtent.width), -static_cast<float>(swapChainExtent.height), 0.0f, 1.0f));
+        commandBuffer.setViewport(0, vk::Viewport(0.0f, static_cast<float>(swapChainExtent.height), static_cast<float>(swapChainExtent.width), -static_cast<float>(swapChainExtent.height), 0.0f, 1.0f));
 		commandBuffer.setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), swapChainExtent));
         commandBuffer.bindVertexBuffers(0, *vertexBuffer, {0}),
         commandBuffer.bindIndexBuffer(*indexBuffer, 0, vk::IndexTypeValue<decltype(indices)::value_type>::value),
@@ -506,7 +505,7 @@ void Renderer::drawFrame()
         assert(result == vk::Result::eTimeout || result == vk::Result::eNotReady);
         throw std::runtime_error("failed to acquire swap chain image!");
     }
-    updtUniformBuffer(imageIndex);
+    updtUniformBuffer(frameIndex);
     commandBuffers[frameIndex].reset();
     recordCommandBuffer(imageIndex);
     
