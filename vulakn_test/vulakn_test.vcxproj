@@ -173,6 +173,7 @@
     <ClInclude Include="debug.h" />
     <ClInclude Include="dependency.h" />
     <ClInclude Include="Renderer.h" />
+    <ClInclude Include="UniformBufferObl.h" />
     <ClInclude Include="Vertex.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

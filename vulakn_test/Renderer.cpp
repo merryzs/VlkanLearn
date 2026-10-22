@@ -1,4 +1,4 @@
-﻿﻿#include "Renderer.h"
+﻿#include "Renderer.h"
 #include "debug.h"
 #include "application.h"
 #include "vertex.h"
