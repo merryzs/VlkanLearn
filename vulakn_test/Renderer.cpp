@@ -109,6 +109,7 @@ void Renderer::createInstance()
     createDescriptorSetLayout();
     createGraphicsPipeline();
     createCommandPool();
+    createDepthResources();
     createTextureImage();
     createTextureImageView();
     createTextureSampler();
@@ -224,6 +225,7 @@ void Renderer::recreateSwapChain()
     
     createSwapchain();
     createImageViews();
+    createDepthResources();
 }
 
 void Renderer::createSwapchain()
@@ -253,7 +255,7 @@ void Renderer::createImageViews()
     swapChainImageViews.reserve(swapChainImages.size());
     for ( auto &image: swapChainImages )
     {
-        swapChainImageViews.emplace_back(createImageView(image, swapChainSurfaceFormat.format));
+        swapChainImageViews.emplace_back(createImageView(image, swapChainSurfaceFormat.format, vk::ImageAspectFlagBits::eColor));
     }
 }
 
@@ -336,7 +338,7 @@ void Renderer::createTextureImage()
 
 void Renderer::createTextureImageView()
 {
-    textureImageView = createImageView( *textureImage, vk::Format::eR8G8B8A8Srgb);
+    textureImageView = createImageView( *textureImage, vk::Format::eR8G8B8A8Srgb, vk::ImageAspectFlagBits::eColor);
 }
 
 void Renderer::createTextureSampler()
@@ -424,10 +426,24 @@ vk::raii::CommandBuffer Renderer::beginSinfleTimeCommands()
     return std::move(commandBuffer);
 }
 
-vk::raii::ImageView Renderer::createImageView(vk::Image const& image, vk::Format format)
+vk::raii::ImageView Renderer::createImageView(vk::Image const &image, vk::Format format, vk::ImageAspectFlags aspectFlags)
 {
     vk::ImageViewCreateInfo viewInfo{ .image = image, .viewType = vk::ImageViewType::e2D, .format = format, .subresourceRange = {.aspectMask =  vk::ImageAspectFlagBits::eColor,.baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1} };
     return vk::raii::ImageView(device, viewInfo);
+}
+
+vk::Format Renderer::findSupportedFormat(const std::vector<vk::Format>& candidates, vk::ImageTiling tiling, vk::FormatFeatureFlags features)
+{
+    for (const auto format : candidates)
+    {
+        vk::FormatProperties props = physicalDevice.getFormatProperties(format);
+        if (((tiling == vk::ImageTiling::eLinear) && ((props.linearTilingFeatures & features) == features)) ||
+            ((tiling == vk::ImageTiling::eOptimal) && ((props.optimalTilingFeatures & features) == features)))
+        {
+            return format;
+        }
+    }
+    throw std::runtime_error{"failed to find supported format"};
 }
 
 void Renderer::endSingleTimeCommands(vk::raii::CommandBuffer&& commandBuffer)
@@ -439,6 +455,12 @@ void Renderer::endSingleTimeCommands(vk::raii::CommandBuffer&& commandBuffer)
     graphicQueue.waitIdle();
 }
 
+void Renderer::createDepthResources()
+{
+    vk::Format depthFormat = findDepthFormat();
+    std::tie(depthImage, depthImageMemory) = createImage(swapChainExtent.width, swapChainExtent.height, depthFormat, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eDepthStencilAttachment, vk::MemoryPropertyFlagBits::eDeviceLocal);
+    depthImageView = createImageView(depthImage, depthFormat, vk::ImageAspectFlagBits::eDepth);
+}
 
 
 void Renderer::createVertexBuffer()
@@ -748,6 +770,10 @@ vk::Extent2D Renderer::chooseSwapExtent(vk::SurfaceCapabilitiesKHR const& capabi
     return shaderModule;
 }
 
+vk::Format Renderer::findDepthFormat()
+{
+    return findSupportedFormat({ vk::Format::eD32Sfloat, vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint}, vk::ImageTiling::eOptimal, vk::FormatFeatureFlagBits::eDepthStencilAttachment);
+}
 
 
 vk::Bool32 Renderer::debugCallback(vk::DebugUtilsMessageSeverityFlagBitsEXT severity, vk::DebugUtilsMessageTypeFlagsEXT type, const vk::DebugUtilsMessengerCallbackDataEXT* data, void*)

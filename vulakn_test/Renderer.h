@@ -31,6 +31,10 @@ private :
     vk::raii::Buffer indexBuffer = nullptr;
     vk::raii::DeviceMemory indexBufferMemory = nullptr;
     
+    vk::raii::Image depthImage = nullptr;
+    vk::raii::DeviceMemory depthImageMemory = nullptr;
+    vk::raii::ImageView depthImageView = nullptr;
+    
     vk::raii::Image        textureImage = nullptr;
     vk::raii::DeviceMemory textureImageMemory = nullptr;
     vk::raii::ImageView    textureImageView = nullptr;
@@ -94,6 +98,12 @@ private :
     void createDescriptorPool();
     void createDescriptorSet();
     void endSingleTimeCommands(vk::raii::CommandBuffer &&commandBuffer);
+    void createDepthResources();
+    
+    
+    
+    
+    
     std::vector<char const*> GetRequiredInstanceExtensions();
     std::vector<const char *> requiredDeviceExtension = {
         vk::KHRSwapchainExtensionName};
@@ -111,12 +121,13 @@ private :
     
     vk::Extent2D chooseSwapExtent(vk::SurfaceCapabilitiesKHR const& capabilities);
     vk::raii::ShaderModule createShaderModule(const std::vector<char> &code) const;
-    
+    vk::Format findDepthFormat();   
  
     std::pair<vk::raii::Image, vk::raii::DeviceMemory> createImage( uint32_t width, uint32_t height, vk::Format format, vk::ImageTiling tiling, vk::ImageUsageFlags usage, vk::MemoryPropertyFlags properties);
     std::pair<vk::raii::Buffer, vk::raii::DeviceMemory> createBuffer(vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties);
 
 
     vk::raii::CommandBuffer beginSinfleTimeCommands();
-    vk::raii::ImageView createImageView(vk::Image const &image, vk::Format format);
+    vk::raii::ImageView createImageView(vk::Image const &image, vk::Format format, vk::ImageAspectFlags aspectFlags);
+    vk::Format findSupportedFormat(const std::vector<vk::Format> &candidates, vk::ImageTiling tiling, vk::FormatFeatureFlags features);
 };
