@@ -317,14 +317,14 @@ void Renderer::createTextureImage()
     }
     
     auto [stagingBuffer, stagingBufferMemory] = createBuffer(imageSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-    void *data = stagingBuffer.mapMemory(0, imageSize);
+    void *data = stagingBufferMemory.mapMemory(0, imageSize);
     memcpy(data, pixels, imageSize);
-    stagingBuffer.unmapMemory();
+    stagingBufferMemory.unmapMemory();
     stbi_image_free(pixels);
     
-    std::tie(createTextureImage(), textureImageMemory) = createImage( texWidth, texHeight, vk::Format::eR8G8B8A8Srgb, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled, vk::MemoryPropertyFlagBits::eDeviceLocal);
+    std::tie(textureImage, textureImageMemory) = createImage( texWidth, texHeight, vk::Format::eR8G8B8A8Srgb, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled, vk::MemoryPropertyFlagBits::eDeviceLocal);
     
-    vk::raii::CommandBuffer commandBuffer = beginSingleTimeCommands();
+    vk::raii::CommandBuffer commandBuffer = beginSinfleTimeCommands();
     transitionImageLayout(commandBuffer, textureImage, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
     copyBufferToImage(commandBuffer, stagingBuffer, textureImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
     transitionImageLayout(commandBuffer, textureImage, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
@@ -414,8 +414,8 @@ void Renderer::endSingleTimeCommands(vk::raii::CommandBuffer&& commandBuffer)
     commandBuffer.end();
 
     vk::SubmitInfo submitInfo{.commandBufferCount = 1, .pCommandBuffers = &*commandBuffer};
-    queue.submit(submitInfo, nullptr);
-    queue.waitIdle();
+    graphicQueue.submit(submitInfo, nullptr);
+    graphicQueue.waitIdle();
 }
 
 
@@ -581,13 +581,6 @@ void Renderer::createDescriptorSet()
         vk::WriteDescriptorSet descriptorWrite{ .dstSet = descriptorSets[i], .dstBinding = 0, .dstArrayElement = 0, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eUniformBuffer, .pBufferInfo = &bufferInfo};
         device.updateDescriptorSets(descriptorWrite, {});
     }
-    
-    
-    
-}
-
-void Renderer::endSingleTimeCommands(vk::raii::CommandBuffer&& commandBuffer)
-{
 }
 
 void Renderer::drawFrame()

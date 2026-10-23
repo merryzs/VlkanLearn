@@ -31,6 +31,9 @@ private :
     vk::raii::Buffer indexBuffer = nullptr;
     vk::raii::DeviceMemory indexBufferMemory = nullptr;
     
+    vk::raii::Image        textureImage       = nullptr;
+    vk::raii::DeviceMemory textureImageMemory = nullptr;
+    
     std::vector<vk::raii::Semaphore> presentCompletSemaphores;
     std::vector<vk::raii::Semaphore> renderCompleteSemaphores;
     std::vector<vk::raii::Fence> drawFence;
