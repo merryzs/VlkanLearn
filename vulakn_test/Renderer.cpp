@@ -592,15 +592,33 @@ void Renderer::createDescriptorPool()
 
 void Renderer::createDescriptorSet()
 {
-    std::vector layouts(MAX_FRAMES_IN_FLIGHT, *descriptorSetLayout);
-    vk::DescriptorSetAllocateInfo allocInfo{ .descriptorPool = descriptorPool, .descriptorSetCount = static_cast<uint32_t>(layouts.size()), .pSetLayouts = layouts.data() };
+    std::vector<vk::DescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, descriptorSetLayout);
+    vk::DescriptorSetAllocateInfo        allocInfo{
+        .descriptorPool     = descriptorPool,
+        .descriptorSetCount = static_cast<uint32_t>(layouts.size()),
+        .pSetLayouts        = layouts.data()};
+
+    descriptorSets.clear();
     descriptorSets = device.allocateDescriptorSets(allocInfo);
-    
+
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
     {
-        vk::DescriptorBufferInfo bufferInfo{ .buffer = uniformeBuffer[i], .offset = 0, .range = sizeof(UniformBufferObl) };
-        vk::WriteDescriptorSet descriptorWrite{ .dstSet = descriptorSets[i], .dstBinding = 0, .dstArrayElement = 0, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eUniformBuffer, .pBufferInfo = &bufferInfo};
-        device.updateDescriptorSets(descriptorWrite, {});
+        vk::DescriptorBufferInfo bufferInfo{.buffer = uniformeBuffer[i], .offset = 0, .range = sizeof(UniformBufferObl)};
+        vk::DescriptorImageInfo  imageInfo{.sampler = textureSampler, .imageView = textureImageView, .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal};
+
+        std::array<vk::WriteDescriptorSet, 2> descriptorWrites{{{.dstSet          = descriptorSets[i],
+                                                                 .dstBinding      = 0,
+                                                                 .dstArrayElement = 0,
+                                                                 .descriptorCount = 1,
+                                                                 .descriptorType  = vk::DescriptorType::eUniformBuffer,
+                                                                 .pBufferInfo     = &bufferInfo},
+                                                                {.dstSet          = descriptorSets[i],
+                                                                 .dstBinding      = 1,
+                                                                 .dstArrayElement = 0,
+                                                                 .descriptorCount = 1,
+                                                                 .descriptorType  = vk::DescriptorType::eCombinedImageSampler,
+                                                                 .pImageInfo      = &imageInfo}}};
+        device.updateDescriptorSets(descriptorWrites, {});
     }
 }
 
