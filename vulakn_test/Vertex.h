@@ -6,7 +6,7 @@ struct Vertex
     glm::vec3 pos;
     glm::vec3 color;
     glm::vec2 texCoord;
-    
+
     static vk::VertexInputBindingDescription getBindingDescription()
     {
         return {.binding = 0, .stride = sizeof(Vertex), .inputRate = vk::VertexInputRate::eVertex};
