@@ -16,6 +16,7 @@ void Application::Run()
         glfwPollEvents();
         renderer->drawFrame();
     }
+    
 }
 
 

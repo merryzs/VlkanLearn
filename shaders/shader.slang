@@ -1,4 +1,5 @@
-﻿struct VSInput {
+﻿
+struct VSInput {
     float2 inPosition;
     float3 inColor;
 };

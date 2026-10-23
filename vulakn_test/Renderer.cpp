@@ -15,6 +15,7 @@
 #include <queue>
 #include <stdexcept>
 #include <vector>
+#include <chrono>
 
 
 
@@ -254,8 +255,8 @@ void Renderer::createImageViews()
 
 void Renderer::createDescriptorSetLayout()
 {
-    vk::DescriptorSetLayoutBinding uniBufObjLayoutBinding{ .binding = 0, .descriptorType = vk::DescriptorType::eUniformBuffer, .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eVertex };
-    vk::DescriptorSetLayoutCreateInfo layoutCreateInfo{ .bindingCount = 1, .pBindings = &uniBufObjLayoutBinding};
+    vk::DescriptorSetLayoutBinding uboLayoutBinding{ .binding = 0, .descriptorType = vk::DescriptorType::eUniformBuffer, .descriptorCount = 1, .stageFlags = vk::ShaderStageFlagBits::eVertex };
+    vk::DescriptorSetLayoutCreateInfo layoutCreateInfo{ .bindingCount = 1, .pBindings = &uboLayoutBinding};
     descriptorSetLayout = vk::raii::DescriptorSetLayout(device, layoutCreateInfo );
 }
 
@@ -275,8 +276,7 @@ void Renderer::createGraphicsPipeline()
     vk::PipelineInputAssemblyStateCreateInfo inputAssembly{.topology = vk::PrimitiveTopology::eTriangleList};
     vk::PipelineViewportStateCreateInfo viewportState{.viewportCount = 1, .scissorCount = 1};
     
-    vk::PipelineRasterizationStateCreateInfo rasterizer{ .depthClampEnable = vk::False, .rasterizerDiscardEnable = vk::False, .polygonMode = vk::PolygonMode::eFill, .cullMode = vk::CullModeFlagBits::eBack, .frontFace = vk::FrontFace::eCounterClockwise, .depthBiasEnable = vk::False, .lineWidth = 1.0f};
-    
+    vk::PipelineRasterizationStateCreateInfo rasterizer{.depthClampEnable = vk::False, .rasterizerDiscardEnable = vk::False, .polygonMode = vk::PolygonMode::eFill, .cullMode = vk::CullModeFlagBits::eBack, .frontFace = vk::FrontFace::eCounterClockwise, .depthBiasEnable = vk::False, .lineWidth = 1.0f};    
     vk::PipelineMultisampleStateCreateInfo multisampling{ .rasterizationSamples = vk::SampleCountFlagBits::e1, .sampleShadingEnable = vk::False};
     vk::PipelineColorBlendAttachmentState colorBlendAttachment{.blendEnable = vk::False, .colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA};
     vk::PipelineColorBlendStateCreateInfo colorBlending{.logicOpEnable = vk::False, .logicOp = vk::LogicOp::eCopy, .attachmentCount = 1, .pAttachments = &colorBlendAttachment};
@@ -449,14 +449,13 @@ void Renderer::updtUniformBuffer(uint32_t currentImage)
     static auto startTime = std::chrono::high_resolution_clock::now();
     auto currentTime = std::chrono::high_resolution_clock::now();
     float time = std::chrono::duration<float>(currentTime-startTime).count();
+    UniformBufferObl ubo;
     
-    UniformBufferObl uniBufObj{};
+    ubo.model = rotate(glm::mat4(1.f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    ubo.view = lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    ubo.proj =  glm::perspective(glm::radians(45.0f), static_cast<float>(swapChainExtent.width) / static_cast<float>(swapChainExtent.height), 0.1f, 10.0f);
     
-    uniBufObj.model = rotate(glm::mat4(1.f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-    uniBufObj.view = lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-    uniBufObj.proj =  glm::perspective(glm::radians(45.0f), static_cast<float>(swapChainExtent.width) / static_cast<float>(swapChainExtent.height), 0.1f, 10.0f);
-    
-    memcpy(uniformBufferMapped[currentImage], &uniBufObj, sizeof(uniBufObj));
+    memcpy(uniformBufferMapped[currentImage], &ubo, sizeof(ubo));
 }
 
 void Renderer::createDescriptorPool()
@@ -475,7 +474,7 @@ void Renderer::createDescriptorSet()
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
     {
         vk::DescriptorBufferInfo bufferInfo{ .buffer = uniformeBuffer[i], .offset = 0, .range = sizeof(UniformBufferObl) };
-        vk::WriteDescriptorSet descriptorWrite{ .dstSet = descriptorSets[i], .dstBinding = 0, .dstArrayElement = 0, .descriptorType = vk::DescriptorType::eUniformBuffer, .pBufferInfo = &bufferInfo};
+        vk::WriteDescriptorSet descriptorWrite{ .dstSet = descriptorSets[i], .dstBinding = 0, .dstArrayElement = 0, .descriptorCount = 1, .descriptorType = vk::DescriptorType::eUniformBuffer, .pBufferInfo = &bufferInfo};
         device.updateDescriptorSets(descriptorWrite, {});
     }
     
