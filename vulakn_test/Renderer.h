@@ -86,7 +86,7 @@ private :
     void updtUniformBuffer(uint32_t currentImage);
     void createDescriptorPool();
     void createDescriptorSet();
-    
+    void endSingleTimeCommands(vk::raii::CommandBuffer &&commandBuffer);
     std::vector<char const*> GetRequiredInstanceExtensions();
     std::vector<const char *> requiredDeviceExtension = {
         vk::KHRSwapchainExtensionName};

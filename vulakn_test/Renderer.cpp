@@ -379,11 +379,9 @@ void Renderer::transitionImageLayout(vk::raii::CommandBuffer& commandBuffer, con
     commandBuffer.pipelineBarrier(sourceStage, destinationStage, {}, {}, {}, barrier);
 }
 
-void Renderer::copyBufferToImage(vk::raii::CommandBuffer& commandBuffer, const vk::raii::Buffer& buffer,
-    vk::raii::Image& image, uint32_t width, uint32_t height)
+void Renderer::copyBufferToImage(vk::raii::CommandBuffer& commandBuffer, const vk::raii::Buffer& buffer,vk::raii::Image& image, uint32_t width, uint32_t height)
 {
-    vk::BufferImageCopy region{ .bufferOffset = 0, .bufferRowLength = 0, .bufferImageHeight = 0, .imageSubresource = { .aspectMask = vk::ImageAspectFlagBits::eColor, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1 }, .imageOffset = {0, 0, 0 }, .imageExtent = {width,height, 1 }};
-    commandBuffer.copyBufferToImage(buffer, image, vk::ImageLayout::eTransferDstOptimal, region);
+    vk::BufferImageCopy region{ .bufferOffset = 0, .bufferRowLength = 0, .bufferImageHeight = 0, .imageSubresource = { .aspectMask = vk::ImageAspectFlagBits::eColor, .mipLevel = 0, .baseArrayLayer = 0, .layerCount = 1 }, .imageOffset = {0, 0, 0 }, .imageExtent = {width,height, 1 }};commandBuffer.copyBufferToImage(buffer, image, vk::ImageLayout::eTransferDstOptimal, region);
 }
 
 std::pair<vk::raii::Buffer, vk::raii::DeviceMemory> Renderer::createBuffer(vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties)
@@ -402,7 +400,25 @@ std::pair<vk::raii::Buffer, vk::raii::DeviceMemory> Renderer::createBuffer(vk::D
 
 vk::raii::CommandBuffer Renderer::beginSinfleTimeCommands()
 {
+    vk::CommandBufferAllocateInfo allocInfo{.commandPool = commandPool, .level = vk::CommandBufferLevel::ePrimary, .commandBufferCount = 1};
+    vk::raii::CommandBuffer       commandBuffer = std::move(vk::raii::CommandBuffers(device, allocInfo).front());
+
+    vk::CommandBufferBeginInfo beginInfo{.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit};
+    commandBuffer.begin(beginInfo);
+
+    return std::move(commandBuffer);
 }
+
+void Renderer::endSingleTimeCommands(vk::raii::CommandBuffer&& commandBuffer)
+{
+    commandBuffer.end();
+
+    vk::SubmitInfo submitInfo{.commandBufferCount = 1, .pCommandBuffers = &*commandBuffer};
+    queue.submit(submitInfo, nullptr);
+    queue.waitIdle();
+}
+
+
 
 void Renderer::createVertexBuffer()
 {
@@ -568,6 +584,10 @@ void Renderer::createDescriptorSet()
     
     
     
+}
+
+void Renderer::endSingleTimeCommands(vk::raii::CommandBuffer&& commandBuffer)
+{
 }
 
 void Renderer::drawFrame()
