@@ -109,6 +109,9 @@ void Renderer::createInstance()
     createDescriptorSetLayout();
     createGraphicsPipeline();
     createCommandPool();
+    createTextureImage();
+    createTextureImageView();
+    createTextureSampler();
     createVertexBuffer();
     createIndexBuffer();
     createUniformBuffers();
@@ -247,12 +250,10 @@ void Renderer::createImageViews()
 {
     assert(swapChainImageViews.empty());
     
-    vk::ImageViewCreateInfo imageViewCreateInfo = { .viewType = vk::ImageViewType::e2D, .format = swapChainSurfaceFormat.format, .subresourceRange = {vk::ImageAspectFlagBits::eColor,0,1,0,1}};
-
-    for (auto &image : swapChainImages)
+    swapChainImageViews.reserve(swapChainImages.size());
+    for ( auto &image: swapChainImages )
     {
-        imageViewCreateInfo.image = image;
-        swapChainImageViews.emplace_back(device, imageViewCreateInfo);
+        swapChainImageViews.emplace_back(createImageView(image, swapChainSurfaceFormat.format));
     }
 }
 
@@ -332,6 +333,19 @@ void Renderer::createTextureImage()
     
 }
 
+void Renderer::createTextureImageView()
+{
+    textureImageView = createImageView( *textureImage, vk::Format::eR8G8B8A8Srgb);
+}
+
+void Renderer::createTextureSampler()
+{
+    vk::PhysicalDeviceProperties properties = physicalDevice.getProperties();
+    
+    vk::SamplerCreateInfo samplerInfo{ .magFilter = vk::Filter::eLinear, .minFilter = vk::Filter::eLinear, .mipmapMode = vk::SamplerMipmapMode::eLinear, .addressModeU = vk::SamplerAddressMode::eRepeat, .addressModeV = vk::SamplerAddressMode::eRepeat, .addressModeW = vk::SamplerAddressMode::eRepeat, .mipLodBias = 0.0f, .anisotropyEnable = vk::True, .maxAnisotropy = properties.limits.maxSamplerAnisotropy, .compareEnable = vk::False, .compareOp = vk::CompareOp::eAlways};
+    textureSampler = vk::raii::Sampler(device, samplerInfo);
+}
+
 std::pair<vk::raii::Image, vk::raii::DeviceMemory> Renderer::createImage(uint32_t width, uint32_t height,vk::Format format, vk::ImageTiling tiling, vk::ImageUsageFlags usage, vk::MemoryPropertyFlags properties)
 {
     vk::ImageCreateInfo imageCreateInfo{ .imageType = vk::ImageType::e2D, .format = format, .extent =  {width, height, 1}, .mipLevels = 1, .arrayLayers = 1, .samples = vk::SampleCountFlagBits::e1, .tiling = tiling, .usage = usage, .sharingMode = vk::SharingMode::eExclusive};
@@ -407,6 +421,12 @@ vk::raii::CommandBuffer Renderer::beginSinfleTimeCommands()
     commandBuffer.begin(beginInfo);
 
     return std::move(commandBuffer);
+}
+
+vk::raii::ImageView Renderer::createImageView(vk::Image const& image, vk::Format format)
+{
+    vk::ImageViewCreateInfo viewInfo{ .image = image, .viewType = vk::ImageViewType::e2D, .format = format, .subresourceRange = {.aspectMask =  vk::ImageAspectFlagBits::eColor,.baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1} };
+    return vk::raii::ImageView(device, viewInfo);
 }
 
 void Renderer::endSingleTimeCommands(vk::raii::CommandBuffer&& commandBuffer)

@@ -31,8 +31,10 @@ private :
     vk::raii::Buffer indexBuffer = nullptr;
     vk::raii::DeviceMemory indexBufferMemory = nullptr;
     
-    vk::raii::Image        textureImage       = nullptr;
+    vk::raii::Image        textureImage = nullptr;
     vk::raii::DeviceMemory textureImageMemory = nullptr;
+    vk::raii::ImageView    textureImageView = nullptr;
+    vk::raii::Sampler textureSampler = nullptr;
     
     std::vector<vk::raii::Semaphore> presentCompletSemaphores;
     std::vector<vk::raii::Semaphore> renderCompleteSemaphores;
@@ -76,6 +78,8 @@ private :
     void createGraphicsPipeline();
     void createCommandPool();
     void createTextureImage();
+    void createTextureImageView();
+    void createTextureSampler();
     void transitionImageLayout(vk::raii::CommandBuffer &commandBuffer, const vk::raii::Image &image, vk::ImageLayout oldLayout, vk::ImageLayout newLayout);
     void copyBufferToImage(vk::raii::CommandBuffer &commandBuffer, const vk::raii::Buffer &buffer, vk::raii::Image &image, uint32_t width, uint32_t height);
     void createVertexBuffer();
@@ -114,4 +118,5 @@ private :
 
 
     vk::raii::CommandBuffer beginSinfleTimeCommands();
+    vk::raii::ImageView createImageView(vk::Image const &image, vk::Format format);
 };
