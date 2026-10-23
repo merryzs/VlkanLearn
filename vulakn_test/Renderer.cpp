@@ -744,12 +744,7 @@ bool Renderer::CheckDeviceSuitability(vk::raii::PhysicalDevice const& physicalDe
     
     auto queueFamilies = physicalDevice.getQueueFamilyProperties();
     uint32_t qfpIndex = 0;
-    bool supportsGraphicsAndPresent = 	    std::ranges::any_of(queueFamilies,
-                                [&physicalDevice, &surface = this->surface, &qfpIndex](auto const &qfp) {
-                                    bool const suitable = (qfp.queueFlags & vk::QueueFlagBits::eGraphics) && physicalDevice.getSurfaceSupportKHR(qfpIndex, *surface);
-                                    qfpIndex++;
-                                    return suitable;
-                                });
+    bool supportsGraphicsAndPresent = std::ranges::any_of(queueFamilies, [&physicalDevice, &surface = this->surface, &qfpIndex](auto const &qfp) { bool const suitable = (qfp.queueFlags & vk::QueueFlagBits::eGraphics) && physicalDevice.getSurfaceSupportKHR(qfpIndex, *surface); qfpIndex++; return suitable;});
 
     auto availableDevicesExtensions = physicalDevice.enumerateDeviceExtensionProperties();
     bool supportsAllRequiredExtentions = std::ranges::all_of(requiredDeviceExtension, [&availableDevicesExtensions](auto const& requiredDeviceExtensions)
