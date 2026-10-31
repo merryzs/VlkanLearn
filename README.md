@@ -2,7 +2,11 @@
 
 Ceci est le projet pipeline 3D, le but était de faire un beau cube qui tourne sur lui même avec L'API Vulkan.
 
-### warning les fichiers ne sont peut être pas bien ranger (désoler pour mon architecture archaïque, j'ai pas finit de réorganiser).
+## se que j'ai appris
+
+Lors de se projet, j'ai appris les bases et la logique derrière Vulkan. C'est comme cela que j'ai comprit comment fonctionne 
+
+
 
 ## Amélioration possible
 
